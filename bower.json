@@ -1,0 +1,23 @@
+{
+  "name": "animate_dist",
+  "version": "0.0.0",
+  "authors": [
+    "Nicolas Xu <xu.shenxin@gmail.com>"
+  ],
+  "moduleType": [
+    "amd"
+  ],
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "app/bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "jquery": "~2.1.4"
+  }
+}
