@@ -10,15 +10,133 @@
 	});
 
 	function initChartFunc() {
-		//Chart.defaults.global.animation = false; 
-		Chart.defaults.global.animationSteps = 5; // very fast animation
-		Chart.defaults.global.responsive = true;
-		this.ctx = document.getElementById("myChart").getContext("2d");
-		this.myBarChart = new Chart(this.ctx).Bar(this.chartData);
+		
+		// set margin
+		var margin = {top: 20, right: 20, bottom: 30, left: 40},
+		// calculate width from margin
+		    width = 960 - margin.left - margin.right,
+		// calculate height from margin
+		    height = 500 - margin.top - margin.bottom;
 
-		console.log(this.myBarChart.datasets);
-		document.theChart = this.myBarChart;
+		// create d3 format object
+		var formatPercent = d3.format(".0%");
 
+		// create ordinal x scale, set range, not domain, domain is set when data done loading
+		// domain is input, range is actual length in pixel
+		var x = d3.scale.ordinal()
+		    .rangeRoundBands([0, width], .1, 1);
+
+		// create y linear scale, set the range, since the origin is (0, 0) the top left corner
+		// of canvas. The lowest data value maps the lowest point, which has the highest y value
+		// which is the height of canvas
+		var y = d3.scale.linear()
+		    .range([height, 0]);
+
+		// create d3 axis for x value, and feed it with the x scale we just created
+		// orientation affects the position of the ticks and their labels in relation
+		// to the axis path, but does not change the position of the axis itself
+		var xAxis = d3.svg.axis()
+		    .scale(x)
+		    .orient("bottom");
+
+		// same as x axis, and apply tick format
+		var yAxis = d3.svg.axis()
+		    .scale(y)
+		    .orient("left")
+		    .tickFormat(formatPercent);
+
+		// appnd svg, set width & height of svg, append g tag in svg, set the margin 
+		// of g tag
+		var svg = d3.select("body").append("svg")
+		    .attr("width", width + margin.left + margin.right)
+		    .attr("height", height + margin.top + margin.bottom)
+		  .append("g")
+		    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+		// load tsv data
+		d3.tsv("data.tsv", function(error, data) {
+
+			// convert d.frequency from string to number
+		  data.forEach(function(d) {
+		    d.frequency = +d.frequency;
+		  });
+
+		  // after data loading done, set the domain for x scale. 
+		  // map return an array of letters
+		  x.domain(data.map(function(d) { return d.letter; }));
+
+		  // set the domain of y scale, 0 -> highest range, max -> 0 range (top)
+		  y.domain([0, d3.max(data, function(d) { return d.frequency; })]);
+
+		  // draw x axis based on a g tag
+		  // translate x axis to the bottom of the svg
+		  svg.append("g")
+		      .attr("class", "x axis")
+		      .attr("transform", "translate(0," + height + ")")
+		      .call(xAxis);
+
+		  // draw y axis, set class, append text label in g tag 
+		  svg.append("g")
+		      .attr("class", "y axis")
+		      .call(yAxis)
+		    .append("text")
+		      .attr("transform", "rotate(-90)")
+		      .attr("y", 6)
+		      .attr("dy", ".71em")
+		      .style("text-anchor", "end")
+		      .text("Frequency");
+
+		  // drawing bars
+		  svg.selectAll(".bar") // select element with .bar class name, which is non
+		      .data(data) // bind data, even there is no element
+		    .enter() // returns placeholder nodes which doesn't have matched data
+		    	.append("rect") // append rect tag to each empty node returned by enter()
+		      .attr("class", "bar") // add bar class
+		      .attr("x", function(d) { return x(d.letter); }) // set x position, x is the d3.scale.ordinal
+		      .attr("width", x.rangeBand()) // width is d3.scale.ordinal calculated range band width
+		      .attr("y", function(d) { return y(d.frequency); }) // set y position relative to top left using y = d3.scale.linear()
+		      .attr("height", function(d) { return height - y(d.frequency); }); // height is the total height - cordinate.y
+
+		  // bind event handler
+		  d3.select("input").on("change", change);
+
+		  // trigger check event in 2 seconds
+		  var sortTimeout = setTimeout(function() {
+		    d3.select("input").property("checked", true).each(change);
+		  }, 2000);
+
+		  console.log( data);
+		  document.data = data;
+
+		  function change() {
+		    clearTimeout(sortTimeout);
+
+		    // Copy-on-write since tweens are evaluated after a delay.
+		    // in event handler, 'this' refers to the dom object that event happens
+		    var x0 = x.domain(data.sort(this.checked
+		        ? function(a, b) { return b.frequency - a.frequency; }
+		        : function(a, b) { return d3.ascending(a.letter, b.letter); })
+		        .map(function(d) { return d.letter; }))
+		        .copy();
+
+		    svg.selectAll(".bar")
+		        .sort(function(a, b) { return x0(a.letter) - x0(b.letter); });
+
+		    var transition = svg.transition().duration(750),
+		        delay = function(d, i) { return i * 50; };
+
+		    transition.selectAll(".bar")
+		        .delay(delay)
+		        .attr("x", function(d) { return x0(d.letter); });
+
+		    transition.select(".x.axis")
+		        .call(xAxis)
+		      .selectAll("g")
+		        .delay(delay);
+		  }
+		});
+
+		
 	}
 
 	function calculateUpdateFunc() {
@@ -38,64 +156,21 @@
 
 		// 3. update tick dist
 		this.updateChart(tickData[this.tickIndex]);
-
 	}
 
 	function updateChartFunc(tickPrice) {
 
-		var tickString = tickPrice.toFixed(5);
-		var bars = this.myBarChart.datasets[0].bars;
-		var exist = false; 
-
-		for(var barIndex = 0; barIndex < bars.length; barIndex++) {
-			if(bars[barIndex].label === tickString) {
-				exist = true; 
-				bars[barIndex].value++;
-				break; // exist the whole loop
-			}
-		}
-		if(!exist) {
-			this.myBarChart.addData([1], tickString);
-		}
-
-		this.myBarChart.update();
 	}
 
 	function initDataFunc() {
 		
-		this.chartData = {
-		    labels: [],
-		    datasets: [
-		        {
-		            label: "My Second dataset",
-		            fillColor: "rgba(151,187,205,0.5)",
-		            strokeColor: "rgba(151,187,205,0.8)",
-		            highlightFill: "rgba(151,187,205,0.75)",
-		            highlightStroke: "rgba(151,187,205,1)",
-		            data: []
-		        }
-		    ]
-		};
+		this.data = [3,4,5,8,12, 20];
+	
 	}
 
 	function startLoopFunc() {
 		console.log('chart data is: ' + this.chartData);
 		console.log(this);
-
-		if(this.timerId == null) {
-			var appObj = this;
-			this.timerId = setInterval(function(){
-				console.log(appObj.tickIndex);
-
-				if(appObj.tickIndex > tickData.length) {
-					clearInterval(appObj.timerId);
-				} else {
-					appObj.calculateUpdateDist();
-				}
-			}, 1000);
-
-		} else {
-		}
 	
 	}
 
